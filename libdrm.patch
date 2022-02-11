@@ -1,0 +1,60 @@
+diff -urN libdrm-2.4.109_orig/debian/control libdrm-2.4.109/debian/control
+--- libdrm-2.4.109_orig/debian/control	2021-12-15 15:55:18.000000000 +0000
++++ libdrm-2.4.109/debian/control	2022-02-10 12:37:40.459312247 +0000
+@@ -65,6 +65,16 @@
+  .
+  This package provides the runtime environment for libdrm.
+ 
++Package: libkms1
++Architecture: linux-any kfreebsd-any
++Depends:
++ libdrm2 (>= ${source:Version}),
++ ${shlibs:Depends},
++ ${misc:Depends},
++Multi-Arch: same
++Pre-Depends: ${misc:Pre-Depends}
++Description: Userspace interface to kernel DRM KMS services
++
+ Package: libdrm-common
+ Architecture: all
+ Depends:
+diff -urN libdrm-2.4.109_orig/debian/libkms1.install libdrm-2.4.109/debian/libkms1.install
+--- libdrm-2.4.109_orig/debian/libkms1.install	1970-01-01 00:00:00.000000000 +0000
++++ libdrm-2.4.109/debian/libkms1.install	2022-02-10 12:37:40.459312247 +0000
+@@ -0,0 +1,2 @@
++usr/lib/*/libkms.so.1*
++usr/bin/kmstest
+diff -urN libdrm-2.4.109_orig/debian/libkms1.symbols libdrm-2.4.109/debian/libkms1.symbols
+--- libdrm-2.4.109_orig/debian/libkms1.symbols	1970-01-01 00:00:00.000000000 +0000
++++ libdrm-2.4.109/debian/libkms1.symbols	2022-02-10 12:37:40.459312247 +0000
+@@ -0,0 +1,10 @@
++libkms.so.1 libdrm2 #MINVER#
++ kms_bo_create@Base 2.4.101-2
++ kms_bo_destroy@Base 2.4.101-2
++ kms_bo_get_prop@Base 2.4.101-2
++ kms_bo_map@Base 2.4.101-2
++ kms_bo_unmap@Base 2.4.101-2
++ kms_create@Base 2.4.101-2
++ kms_destroy@Base 2.4.101-2
++ kms_get_prop@Base 2.4.101-2
++
+diff -urN libdrm-2.4.109_orig/debian/rules libdrm-2.4.109/debian/rules
+--- libdrm-2.4.109_orig/debian/rules	2021-12-15 15:55:18.000000000 +0000
++++ libdrm-2.4.109/debian/rules	2022-02-10 12:39:23.535562513 +0000
+@@ -13,7 +13,7 @@
+ 	-Ddefault_library=both \
+ 	-Dradeon=true \
+ 	-Damdgpu=true \
+-	-Dlibkms=false \
++	-Dlibkms=true \
+ 	-Dinstall-test-programs=true \
+ 	-Dvalgrind=false \
+ 	$()
+@@ -136,6 +136,7 @@
+ ifeq ($(FREEDRENO), yes)
+ 	dh_makeshlibs -plibdrm-freedreno1 -V'libdrm-freedreno1 (>= 2.4.97)' -- -c4
+ endif
++	dh_makeshlibs -plibkms1 -V'libkms1 (>= 2.4.97)' -- -c4
+ 
+ %:
+ 	dh $@ --with quilt \
