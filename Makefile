@@ -36,7 +36,7 @@ debian_armhf.disk: debian_armhf.tar.gz
 
 	sudo chroot tmp.mnt/ sh -c "cat /etc/apt/sources.list | sed s/deb/deb-src/ >> /etc/apt/sources.list"
 	sudo chroot tmp.mnt/ apt-get -y update
-	sudo chroot tmp.mnt/ apt-get -y install build-essential git meson valgrind gdb autoconf libtool pkg-config devscripts locales-all linux-image-armmp-lpae
+	sudo chroot tmp.mnt/ apt-get -y install build-essential git meson valgrind gdb autoconf libtool pkg-config devscripts locales-all linux-image-armmp qemu-guest-agent
 	sudo chroot tmp.mnt/ apt-get -y clean
 
 	$(call unmount_binds)
@@ -44,7 +44,19 @@ debian_armhf.disk: debian_armhf.tar.gz
 
 	mv tmp.$@ $@
 
-debian_directfb_armhf.disk: debian_armhf.disk
+define clone_git_repo
+	sudo chroot tmp.mnt/ sh -c "cd /root && git clone $(1)"
+endef
+
+define build_meson
+	sudo chroot tmp.mnt/ sh -c "cd /root/$(1) && meson build && cd build && ninja && ninja install"
+endef
+
+define build_autotools
+	sudo chroot tmp.mnt/ sh -c "cd /root/$(1) && ./configure $(2) && make && make install"
+endef
+
+debian_directfb_base_armhf.disk.lz4: debian_armhf.disk
 	cp $<  tmp.$@
 	$(call mount_rootfs,tmp.$@)
 	$(call mount_binds)
@@ -57,14 +69,28 @@ debian_directfb_armhf.disk: debian_armhf.disk
 	sudo cp libdrm.patch tmp.mnt/root/libdrm/
 	sudo chroot tmp.mnt/ sh -c "cd /root/libdrm/libdrm-2.4.109 && patch -p1 < ../libdrm.patch && debuild -us -uc && dpkg -i ../*.deb"
 
-	sudo chroot tmp.mnt/ sh -c "cd /root && git clone https://github.com/deniskropp/flux.git"
+	$(call unmount_binds)
+	$(call unmount_rootfs)
+	lz4 -z --rm tmp.$@ $@
+
+debian_directfb_armhf.disk: debian_directfb_base_armhf.disk.lz4
+	lz4cat $< > tmp.$@
+	$(call mount_rootfs,tmp.$@)
+	$(call mount_binds)
+	sudo chroot tmp.mnt/ apt-get -y update
+
+	$(call clone_git_repo,https://github.com/deniskropp/flux.git)
 	sudo chroot tmp.mnt/ sh -c "cd /root/flux && autoreconf -fi && ./configure && make && make install"
 
-	sudo chroot tmp.mnt/ sh -c "cd /root && git clone https://github.com/directfb2/DirectFB2.git"
-	sudo chroot tmp.mnt/ sh -c "cd /root/DirectFB2 && meson build && cd build && ninja && ninja install"
+	$(call clone_git_repo,https://github.com/directfb2/DirectFB2.git)
+	$(call build_meson,DirectFB2)
 
-	sudo chroot tmp.mnt/ sh -c "cd /root && git clone https://github.com/directfb2/DirectFB-examples.git"
-	sudo chroot tmp.mnt/ sh -c "cd /root/DirectFB-examples && meson build && cd build && ninja && ninja install"
+	$(call clone_git_repo,https://github.com/directfb2/DirectFB-examples.git)
+	$(call build_meson,DirectFB-examples)
+
+	sudo chroot tmp.mnt/ apt-get -y install libasound2-dev libxext-dev
+	$(call clone_git_repo,https://github.com/libsdl-org/SDL-1.2.git)
+	$(call build_autotools,SDL-1.2,--disable-video-fbcon)
 
 	$(call unmount_binds)
 	$(call unmount_rootfs)
@@ -82,6 +108,13 @@ chroot_debian_armhf: debian_directfb_armhf.disk
 	$(call mount_rootfs,$<)
 	$(call mount_binds)
 	- sudo chroot tmp.mnt/ /bin/bash
+	$(call unmount_binds)
+	$(call unmount_rootfs)
+
+update_directfb2: debian_directfb_armhf.disk
+	$(call mount_rootfs,$<)
+	$(call mount_binds)
+	- sudo chroot tmp.mnt/ sh -c "cd /root/DirectFB2/ && git fetch --all && git reset --hard fifteenhex/valgrind_fixes && cd build && ninja && ninja install"
 	$(call unmount_binds)
 	$(call unmount_rootfs)
 
