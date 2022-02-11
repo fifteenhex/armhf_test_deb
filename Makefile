@@ -49,7 +49,7 @@ define clone_git_repo
 endef
 
 define build_meson
-	sudo chroot tmp.mnt/ sh -c "cd /root/$(1) && meson build && cd build && ninja && ninja install"
+	sudo chroot tmp.mnt/ sh -c "cd /root/$(1) && meson $(2) build && cd build && ninja && ninja install"
 endef
 
 define build_autotools
@@ -83,7 +83,7 @@ debian_directfb_armhf.disk: debian_directfb_base_armhf.disk.lz4
 	sudo chroot tmp.mnt/ sh -c "cd /root/flux && autoreconf -fi && ./configure && make && make install"
 
 	$(call clone_git_repo,https://github.com/directfb2/DirectFB2.git)
-	$(call build_meson,DirectFB2)
+	$(call build_meson,DirectFB2,--debug)
 
 	$(call clone_git_repo,https://github.com/directfb2/DirectFB-examples.git)
 	$(call build_meson,DirectFB-examples)
@@ -114,7 +114,7 @@ chroot_debian_armhf: debian_directfb_armhf.disk
 update_directfb2: debian_directfb_armhf.disk
 	$(call mount_rootfs,$<)
 	$(call mount_binds)
-	- sudo chroot tmp.mnt/ sh -c "cd /root/DirectFB2/ && git fetch --all && git reset --hard fifteenhex/valgrind_fixes && cd build && ninja && ninja install"
+	- sudo chroot tmp.mnt/ sh -c "cd /root/DirectFB2/ && git fetch --all && git reset --hard fifteenhex/qemu_virtiogpu_fixes && cd build && ninja && ninja install"
 	$(call unmount_binds)
 	$(call unmount_rootfs)
 
@@ -123,12 +123,15 @@ pullkernel_directfb_armhf: debian_directfb_armhf.disk
 	sudo cp tmp.mnt/boot/initrd.img-5.16.0-1-armmp tmp.mnt/boot/vmlinuz-5.16.0-1-armmp ./
 	$(call unmount_rootfs)
 
+#drm.debug=0x2f
 run_debian_directfb_armhf:
 	qemu-system-arm -M virt,highmem=off				    	\
 		-smp 4								\
-		-device virtio-gpu-pci						\
+		-device virtio-gpu-pci,xres=640,yres=480			\
 		-drive file=debian_directfb_armhf.disk,format=raw		\
 		-m 1024M							\
 		-kernel vmlinuz-5.16.0-1-armmp					\
 		-initrd initrd.img-5.16.0-1-armmp				\
-		-append "root=/dev/vda rw"
+		-append "root=/dev/vda rw"					\
+		-display sdl							\
+		-serial mon:stdio
